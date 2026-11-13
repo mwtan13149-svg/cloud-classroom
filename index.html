@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>云端课室</title>
+  <style>
+    :root {
+      --ink: #182336;
+      --muted: #718096;
+      --blue: #58a9df;
+      --blue-deep: #287fba;
+      --blue-soft: #eef8ff;
+      --paper: #ffffff;
+      --page: #f5f8fb;
+      --line: #e5ebf1;
+      --green: #36ad7a;
+      --green-soft: #eaf8f2;
+      --orange: #f39a51;
+      --orange-soft: #fff4e9;
+      --red: #ea6d73;
+      --shadow: 0 14px 38px rgba(24, 49, 76, .09);
+      --radius: 22px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, "Microsoft YaHei", "PingFang SC", system-ui, sans-serif; color: var(--ink); background: var(--page); }
+    button, select, input { font: inherit; }
+    button { cursor: pointer; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 250px 1fr; }
+    .sidebar { position: sticky; top: 0; height: 100vh; background: #fff; border-right: 1px solid var(--line); padding: 22px 17px; display: flex; flex-direction: column; z-index: 4; }
+    .brand { display: flex; align-items: center; gap: 12px; padding: 3px 8px 25px; }
+    .logo-crop { width: 46px; height: 46px; overflow: hidden; border-radius: 14px; background: #f4fbff; position: relative; flex: 0 0 auto; }
+    .logo-crop img { position: absolute; width: 160%; height: 160%; max-width: none; left: -30%; top: -37%; }
+    .brand-name { font-weight: 850; font-size: 19px; letter-spacing: -.4px; }
+    .brand-sub { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .class-switch { width: 100%; padding: 12px 13px; border: 1px solid var(--line); border-radius: 15px; background: #fafcfe; display: flex; gap: 10px; align-items: center; color: var(--ink); font-weight: 720; }
+    .class-switch .dot { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 9px; background: var(--blue); color: #fff; }
+    nav { display: grid; gap: 7px; margin-top: 22px; }
+    .nav-item { border: 0; background: transparent; color: #536174; border-radius: 14px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; text-align: left; font-weight: 680; transition: .18s ease; }
+    .nav-item:hover { background: #f5f9fc; color: var(--ink); transform: translateX(2px); }
+    .nav-item.active { background: var(--blue-soft); color: var(--blue-deep); }
+    .nav-icon { width: 25px; font-size: 19px; text-align: center; }
+    .sidebar-bottom { margin-top: auto; }
+    .help-card { padding: 16px; border-radius: 18px; background: linear-gradient(145deg, #eff9ff, #f8fcff); border: 1px solid #d9effd; }
+    .help-card b { display: block; font-size: 13px; }
+    .help-card span { display: block; color: var(--muted); font-size: 11px; line-height: 1.5; margin: 5px 0 11px; }
+    .link-btn { border: 0; background: transparent; padding: 0; color: var(--blue-deep); font-size: 12px; font-weight: 800; }
+    .main { min-width: 0; }
+    .topbar { height: 80px; display: flex; align-items: center; justify-content: space-between; padding: 0 34px; background: rgba(255,255,255,.88); border-bottom: 1px solid var(--line); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 3; }
+    .crumbs { color: var(--muted); font-size: 13px; }
+    .crumbs strong { color: var(--ink); }
+    .top-actions { display: flex; align-items: center; gap: 11px; }
+    .icon-btn { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 13px; background: #fff; color: #57667a; }
+    .profile { display: flex; align-items: center; gap: 10px; padding-left: 7px; }
+    .avatar { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(145deg, #bfe9ff, #67b7e8); display: grid; place-items: center; font-weight: 900; color: #fff; }
+    .profile b { font-size: 13px; display: block; }
+    .profile span { font-size: 11px; color: var(--muted); }
+    .content { padding: 30px 34px 45px; max-width: 1600px; margin: auto; }
+    .hero { display: grid; grid-template-columns: 1fr 330px; gap: 22px; }
+    .welcome { min-height: 210px; border-radius: 28px; padding: 31px 34px; background: linear-gradient(115deg, #e9f8ff 0%, #f4fbff 58%, #fff 100%); border: 1px solid #dceffb; position: relative; overflow: hidden; box-shadow: var(--shadow); }
+    .welcome::after { content: ""; position: absolute; width: 260px; height: 260px; border-radius: 50%; right: -60px; top: -70px; background: rgba(88,169,223,.12); }
+    .welcome-cat { position: absolute; width: 190px; height: 190px; right: 24px; bottom: -21px; border-radius: 50%; overflow: hidden; opacity: .95; }
+    .welcome-cat img { width: 266px; height: 266px; max-width: none; transform: translate(-40px,-55px); }
+    .eyebrow { color: var(--blue-deep); font-size: 12px; font-weight: 900; letter-spacing: 1.2px; text-transform: uppercase; }
+    h1 { font-size: 32px; margin: 9px 0 8px; letter-spacing: -.9px; }
+    .welcome p { max-width: 560px; margin: 0; color: #66768b; line-height: 1.7; font-size: 14px; position: relative; z-index: 1; }
+    .hero-buttons { display: flex; gap: 10px; margin-top: 23px; position: relative; z-index: 1; }
+    .primary, .secondary, .danger, .soft { border-radius: 13px; padding: 11px 16px; font-weight: 800; border: 0; }
+    .primary { background: var(--blue); color: #fff; box-shadow: 0 8px 20px rgba(62,151,209,.25); }
+    .primary:hover { background: var(--blue-deep); }
+    .secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+    .soft { background: var(--blue-soft); color: var(--blue-deep); }
+    .stats-card { background: #fff; border: 1px solid var(--line); border-radius: 28px; padding: 24px; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between; }
+    .stats-title { display: flex; align-items: center; justify-content: space-between; }
+    .stats-title b { font-size: 15px; }
+    .status-live { font-size: 11px; color: var(--green); background: var(--green-soft); padding: 5px 8px; border-radius: 30px; font-weight: 800; }
+    .students-count { font-size: 36px; font-weight: 900; letter-spacing: -1px; margin-top: 9px; }
+    .students-count small { font-size: 13px; color: var(--muted); font-weight: 600; }
+    .faces { display: flex; margin: 12px 0 18px 5px; }
+    .face { width: 34px; height: 34px; margin-left: -5px; border: 3px solid #fff; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 900; color: #fff; }
+    .face:nth-child(1){background:#71b7e4}.face:nth-child(2){background:#e99391}.face:nth-child(3){background:#e5b85f}.face:nth-child(4){background:#7ec59b}.face:nth-child(5){background:#998bd0}.face:nth-child(6){background:#edf1f5;color:#77869a}
+    .section { margin-top: 30px; }
+    .section-head { display: flex; align-items: end; justify-content: space-between; margin-bottom: 15px; }
+    .section-title h2 { font-size: 19px; margin: 0 0 5px; letter-spacing: -.4px; }
+    .section-title p { margin: 0; color: var(--muted); font-size: 12px; }
+    .filter-row { display: flex; gap: 8px; }
+    .chip { border: 1px solid var(--line); background: #fff; color: #677589; border-radius: 11px; padding: 8px 12px; font-size: 12px; font-weight: 720; }
+    .chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .document-grid { display: grid; grid-template-columns: repeat(4, minmax(210px, 1fr)); gap: 16px; }
+    .doc-card { background: #fff; border: 1px solid var(--line); border-radius: 20px; overflow: hidden; transition: .18s ease; position: relative; }
+    .doc-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); border-color: #cfe5f3; }
+    .doc-preview { height: 142px; background: #edf5fa; padding: 17px 23px 0; position: relative; }
+    .page-mini { height: 125px; background: #fff; border-radius: 8px 8px 0 0; box-shadow: 0 8px 18px rgba(31,65,91,.1); padding: 17px; }
+    .mini-title { height: 8px; width: 58%; background: #41536b; border-radius: 6px; margin-bottom: 13px; opacity: .8; }
+    .mini-line { height: 4px; background: #dbe3eb; border-radius: 5px; margin: 7px 0; }
+    .mini-line.short { width: 65%; }
+    .scribble { height: 25px; width: 82px; border-bottom: 4px solid var(--blue); border-radius: 50%; transform: rotate(-5deg); margin: 3px 0 0 20px; }
+    .pdf-badge { position: absolute; left: 12px; top: 12px; background: #eb696f; color: #fff; border-radius: 8px; padding: 5px 7px; font-size: 10px; font-weight: 900; box-shadow: 0 5px 12px rgba(220,82,90,.22); }
+    .doc-body { padding: 15px; }
+    .doc-title-row { display: flex; gap: 7px; justify-content: space-between; align-items: start; }
+    .doc-title { font-weight: 850; font-size: 14px; line-height: 1.4; }
+    .more { border: 0; background: transparent; color: #8d99a9; font-weight: 900; }
+    .doc-meta { color: var(--muted); font-size: 11px; margin-top: 7px; }
+    .doc-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+    .state { border: 0; border-radius: 10px; padding: 7px 9px; font-size: 10px; font-weight: 850; }
+    .state.locked { background: #f0f3f6; color: #5c6878; }
+    .state.editable { background: var(--green-soft); color: #25865e; }
+    .state.draft { background: var(--orange-soft); color: #b66b2e; }
+    .open-link { border: 0; background: transparent; color: var(--blue-deep); font-size: 11px; font-weight: 850; }
+    .activity-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .panel { background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 20px; }
+    .quick-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+    .quick { border: 1px solid var(--line); background: #fafcfe; padding: 14px; border-radius: 15px; text-align: left; }
+    .quick .qicon { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; margin-bottom: 10px; background: var(--blue-soft); }
+    .quick b { display: block; font-size: 12px; }
+    .quick span { display: block; color: var(--muted); font-size: 10px; margin-top: 3px; }
+    .wheel-box { display: flex; align-items: center; gap: 20px; margin-top: 15px; }
+    .wheel { width: 95px; height: 95px; border-radius: 50%; border: 7px solid #fff; outline: 2px solid #e6edf4; background: conic-gradient(#58a9df 0 45deg,#f09b57 45deg 90deg,#72c699 90deg 135deg,#9c88d5 135deg 180deg,#f2c65e 180deg 225deg,#ea797e 225deg 270deg,#63c4c5 270deg 315deg,#75a0dd 315deg); position: relative; box-shadow: 0 8px 20px rgba(33,70,96,.12); }
+    .wheel::after { content: ""; position: absolute; inset: 33px; border-radius: 50%; background: #fff; }
+    .modal.wheel-modal { width: min(720px, 94vw); max-height: 94vh; overflow: auto; padding: 30px 34px 34px; }
+    .reel-intro { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 20px; }
+    .reel-count { display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 8px 12px; background: #eaf5fc; color: #287dad; font-size: 12px; font-weight: 850; }
+    .reel-count::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #5bb29a; }
+    .reel-hint { color: var(--muted); font-size: 12px; }
+    .reel-shell { position: relative; padding: 20px; border-radius: 28px; background: linear-gradient(135deg,#e8f7ff,#f5f2ff 58%,#fff1e5); box-shadow: inset 0 0 0 1px #e0e9f2; }
+    .reel-window { position: relative; height: 246px; overflow: hidden; border-radius: 20px; background: #fff; box-shadow: 0 15px 35px rgba(45,91,124,.11),inset 0 0 0 1px #e1eaf1; }
+    .reel-window::before,.reel-window::after { content: ""; position: absolute; left: 0; right: 0; height: 82px; z-index: 3; pointer-events: none; }
+    .reel-window::before { top: 0; background: linear-gradient(#fff 5%,rgba(255,255,255,.68)); }
+    .reel-window::after { bottom: 0; background: linear-gradient(rgba(255,255,255,.68),#fff 95%); }
+    .reel-focus { position: absolute; z-index: 1; top: 82px; left: 12px; right: 12px; height: 82px; border-radius: 16px; background: #eaf5ff; border: 2px solid #8cc8ed; box-shadow: 0 5px 16px rgba(76,156,213,.13); pointer-events: none; }
+    .reel-track { position: relative; z-index: 2; will-change: transform; }
+    .reel-row { height: 82px; display: flex; align-items: center; justify-content: center; padding: 0 18px; color: #1d668f; font-size: clamp(24px,3vw,34px); font-weight: 900; letter-spacing: .08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .reel-window.finished .reel-focus { background: #e9f8ef; border-color: #73c99d; box-shadow: 0 0 0 7px rgba(115,201,157,.12); }
+    .reel-window.finished .reel-row { color: #168158; }
+    .reel-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; }
+    .wheel-subtitle { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .wheel-copy b { display: block; font-size: 14px; }
+    .wheel-copy span { display: block; color: var(--muted); font-size: 11px; line-height: 1.5; margin: 5px 0 11px; }
+
+    /* editor */
+    #editorView { display: none; min-height: 100vh; background: #e9eef3; }
+    .editor-top { height: 72px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; }
+    .editor-left, .editor-right { display: flex; align-items: center; gap: 10px; }
+    .interaction-btn { border: 0; border-radius: 12px; padding: 11px 15px; background: #eaf5ff; color: #2278b0; font-size: 12px; font-weight: 850; white-space: nowrap; }
+    .interaction-btn:hover { background: #d8edfc; }
+    .back-btn { width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 13px; background: #fff; font-size: 18px; }
+    .file-name b { display: block; font-size: 14px; }
+    .file-name span { display: block; color: var(--muted); font-size: 10px; margin-top: 3px; }
+    .save-state { color: var(--green); font-size: 11px; font-weight: 800; }
+    .permission-select { border: 1px solid #c9eadc; background: var(--green-soft); color: #237c59; border-radius: 12px; padding: 10px 12px; font-weight: 850; font-size: 12px; }
+    .editor-shell { display: grid; grid-template-columns: 82px 1fr 240px; height: calc(100vh - 72px); }
+    .toolbar { background: #fff; border-right: 1px solid var(--line); padding: 14px 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; overflow-y: auto; }
+    .tool { width: 58px; min-height: 54px; padding: 7px 3px; border: 1px solid transparent; background: transparent; border-radius: 13px; color: #667489; font-size: 9px; font-weight: 750; }
+    .tool strong { display: block; font-size: 20px; color: #48586d; margin-bottom: 3px; }
+    .tool:hover, .tool.active { background: var(--blue-soft); border-color: #cde9f8; color: var(--blue-deep); }
+    .tool.active strong { color: var(--blue-deep); }
+    .tool-sep { height: 1px; width: 48px; background: var(--line); margin: 3px 0; }
+    .canvas-stage { overflow: auto; padding: 28px 35px 50px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .canvas-controls { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.95); border: 1px solid var(--line); border-radius: 13px; padding: 6px 9px; box-shadow: 0 5px 16px rgba(34,59,78,.08); }
+    .canvas-controls button { width: 30px; height: 30px; border: 0; border-radius: 8px; background: #f3f6f9; }
+    .canvas-controls span { font-size: 11px; color: var(--muted); min-width: 48px; text-align: center; }
+    .pdf-sheet { width: min(800px, 84vw); aspect-ratio: 1.414/1; flex: 0 0 auto; background: #fff; box-shadow: 0 16px 45px rgba(30,50,68,.17); position: relative; border-radius: 3px; overflow: hidden; touch-action: none; transform-origin: center center; will-change: transform; }
+    .pdf-content { position: absolute; inset: 0; padding: 8% 9%; pointer-events: none; }
+    #pdfCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: none; pointer-events: none; }
+    .pdf-content h2 { font-size: clamp(22px, 2.4vw, 36px); margin: 0 0 12px; color: #263751; }
+    .pdf-content .lead { color: #4f83ad; font-weight: 800; margin-bottom: 30px; }
+    .lesson-box { border-left: 5px solid var(--blue); background: #f5fbff; padding: 17px 20px; border-radius: 0 13px 13px 0; margin: 20px 0; }
+    .lesson-box b { display: block; margin-bottom: 8px; }
+    .lesson-box p, .pdf-p { color: #637287; line-height: 1.8; font-size: clamp(11px, 1.2vw, 15px); margin: 0; }
+    #drawCanvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+    .editor-panel { background: #fff; border-left: 1px solid var(--line); padding: 18px 16px; overflow: auto; }
+    .side-section { border-bottom: 1px solid var(--line); padding-bottom: 17px; margin-bottom: 17px; }
+    .side-section h3 { margin: 0 0 12px; font-size: 12px; }
+    .colors { display: flex; flex-wrap: wrap; gap: 8px; }
+    .color { width: 28px; height: 28px; border-radius: 50%; border: 3px solid #fff; outline: 1px solid #dce4eb; }
+    .color.selected { outline: 3px solid #c8e7f8; }
+    .range-row { margin-top: 15px; }
+    .range-row label { display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; margin-bottom: 7px; }
+    input[type="range"] { width: 100%; accent-color: var(--blue); }
+    .people-online { display: grid; gap: 9px; }
+    .person { display: flex; gap: 9px; align-items: center; font-size: 11px; }
+    .person i { width: 9px; height: 9px; border-radius: 50%; background: var(--green); margin-left: auto; }
+    .tiny-face { width: 28px; height: 28px; border-radius: 50%; background: #dceffc; display: grid; place-items: center; font-size: 10px; font-style: normal; }
+    .history-item { font-size: 10px; color: var(--muted); line-height: 1.5; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+    .history-item b { color: var(--ink); }
+
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(18,31,48,.35); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 30; }
+    .modal-backdrop.show { display: flex; }
+    .modal { width: min(470px, 92vw); background: #fff; border-radius: 24px; padding: 24px; box-shadow: 0 30px 80px rgba(16,33,51,.25); }
+    .modal-head { display: flex; justify-content: space-between; align-items: start; }
+    .modal h3 { margin: 0 0 5px; }
+    .modal p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .close { border: 0; background: #f1f4f7; width: 33px; height: 33px; border-radius: 10px; }
+    .dropzone { margin-top: 18px; border: 2px dashed #cfe5f3; border-radius: 18px; background: #f7fbfe; min-height: 180px; display: grid; place-items: center; text-align: center; padding: 20px; color: #5c7488; }
+    .dropzone strong { display: block; font-size: 28px; margin-bottom: 7px; }
+    .modal-actions { display: flex; justify-content: end; gap: 9px; margin-top: 17px; }
+    .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); background: #182336; color: #fff; border-radius: 12px; padding: 11px 17px; opacity: 0; pointer-events: none; transition: .22s; z-index: 50; font-size: 12px; box-shadow: 0 10px 25px rgba(0,0,0,.2); }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 1120px) {
+      .app { grid-template-columns: 210px 1fr; }
+      .document-grid { grid-template-columns: repeat(2, 1fr); }
+      .hero { grid-template-columns: 1fr 280px; }
+      .welcome-cat { opacity: .35; }
+      .editor-shell { grid-template-columns: 76px 1fr; }
+      .editor-panel { display: none; }
+    }
+    @media (max-width: 760px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .content { padding: 20px 16px 35px; }
+      .topbar { padding: 0 16px; }
+      .hero, .activity-grid { grid-template-columns: 1fr; }
+      .document-grid { grid-template-columns: 1fr; }
+      .welcome-cat { display: none; }
+      .section-head { align-items: start; gap: 12px; flex-direction: column; }
+      .editor-shell { grid-template-columns: 1fr; }
+      .toolbar { position: fixed; z-index: 20; bottom: 12px; left: 10px; right: 10px; height: 70px; flex-direction: row; overflow-x: auto; border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); }
+      .canvas-stage { padding: 20px 12px 95px; }
+      .pdf-sheet { width: 96vw; }
+      .profile { display: none; }
+      .editor-top { height: auto; min-height: 108px; padding: 9px 12px; gap: 8px; flex-wrap: wrap; }
+      .editor-left, .editor-right { width: 100%; justify-content: space-between; }
+      .editor-right .save-state, .editor-right #shareBtn { display: none; }
+      .editor-right .permission-select { font-size: 11px; padding: 9px; }
+      .editor-shell { height: calc(100vh - 108px); }
+      .modal.wheel-modal { width: 96vw; padding: 20px; }
+      .reel-intro,.reel-footer { align-items: flex-start; flex-direction: column; }
+      .reel-shell { padding: 12px; }
+      .reel-row { font-size: clamp(20px,6vw,30px); }
+    }
+  </style>
+</head>
+<body>
+  <div id="dashboardView" class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo-crop"><img src="assets/cat-logo.jpeg" alt="手绘猫咪图案"></div>
+        <div><div class="brand-name">云端课室</div><div class="brand-sub">一起写，一起学</div></div>
+      </div>
+      <button class="class-switch"><span class="dot">二</span><span>初二华文 A 班</span><span style="margin-left:auto">⌄</span></button>
+      <nav>
+        <button class="nav-item active"><span class="nav-icon">⌂</span>课室主页</button>
+        <button class="nav-item"><span class="nav-icon">▤</span>PDF 资料</button>
+        <button class="nav-item"><span class="nav-icon">✎</span>白板</button>
+        <button class="nav-item" id="rosterNav"><span class="nav-icon">♟</span>学生名单</button>
+        <button class="nav-item"><span class="nav-icon">⚙</span>课室设置</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="help-card"><b>课室访问代码</b><span>云端版本将提供学生免登录访问。</span><button class="link-btn" id="copyCode">云端功能 · 待接入</button></div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="crumbs">我的课室&nbsp; / &nbsp;<strong>初二华文 A 班</strong></div>
+        <div class="top-actions"><button class="icon-btn">⌕</button><button class="icon-btn">♢</button><div class="profile"><div class="avatar">王</div><div><b>王老师</b><span>课室拥有者</span></div></div></div>
+      </header>
+      <div class="content">
+        <section class="hero">
+          <div class="welcome">
+            <div class="eyebrow">CLASSROOM SPACE</div><h1>初二华文 A 班</h1>
+            <p>集中管理课室里的所有 PDF、共享批注与学生名单。开放需要讨论的资料，其他文档则保持锁定。</p>
+            <div class="hero-buttons"><button class="primary" id="uploadBtn">＋ 上传 PDF</button><button class="secondary" id="blankBtn">✎ 新建白板</button></div>
+            <div class="welcome-cat"><img src="assets/cat-logo.jpeg" alt=""></div>
+          </div>
+          <div class="stats-card">
+            <div><div class="stats-title"><b>课室成员</b><span class="status-live">本机试用</span></div><div class="students-count">30 <small>名学生</small></div><div class="faces"><div class="face">林</div><div class="face">陈</div><div class="face">黄</div><div class="face">李</div><div class="face">吴</div><div class="face">+25</div></div></div>
+            <button class="secondary" id="rosterOpen" style="width:100%">查看学生名单　›</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head"><div class="section-title"><h2>课室资料</h2><p id="recordCount">4 份示例 PDF · 本机保存</p></div><div class="filter-row"><button class="chip active">全部</button><button class="chip">可修改</button><button class="chip">已锁定</button><button class="chip">草稿</button></div></div>
+          <div class="document-grid">
+            <article class="doc-card" data-title="第一课：人物描写"><div class="doc-preview"><span class="pdf-badge">PDF</span><div class="page-mini"><div class="mini-title"></div><div class="mini-line"></div><div class="mini-line short"></div><div class="scribble"></div></div></div><div class="doc-body"><div class="doc-title-row"><div class="doc-title">第一课：人物描写</div><button class="more">•••</button></div><div class="doc-meta">12 页 · 今天 10:24 更新</div><div class="doc-footer"><button class="state editable">✎ 访客可修改</button><button class="open-link">打开 ›</button></div></div></article>
+            <article class="doc-card" data-title="第二课：说明文"><div class="doc-preview" style="background:#f3f1fb"><span class="pdf-badge">PDF</span><div class="page-mini"><div class="mini-title"></div><div class="mini-line"></div><div class="mini-line"></div><div class="mini-line short"></div></div></div><div class="doc-body"><div class="doc-title-row"><div class="doc-title">第二课：说明文</div><button class="more">•••</button></div><div class="doc-meta">18 页 · 昨天 16:08 更新</div><div class="doc-footer"><button class="state locked">▣ 已锁定</button><button class="open-link">打开 ›</button></div></div></article>
+            <article class="doc-card" data-title="作文范例"><div class="doc-preview" style="background:#fff4ea"><span class="pdf-badge">PDF</span><div class="page-mini"><div class="mini-title"></div><div class="mini-line"></div><div class="mini-line short"></div><div class="scribble" style="border-color:#f39a51"></div></div></div><div class="doc-body"><div class="doc-title-row"><div class="doc-title">作文范例</div><button class="more">•••</button></div><div class="doc-meta">8 页 · 11月11日更新</div><div class="doc-footer"><button class="state locked">▣ 已锁定</button><button class="open-link">打开 ›</button></div></div></article>
+            <article class="doc-card" data-title="阅读理解练习"><div class="doc-preview" style="background:#eef8f3"><span class="pdf-badge">PDF</span><div class="page-mini"><div class="mini-title"></div><div class="mini-line short"></div><div class="mini-line"></div><div class="mini-line short"></div></div></div><div class="doc-body"><div class="doc-title-row"><div class="doc-title">阅读理解练习</div><button class="more">•••</button></div><div class="doc-meta">6 页 · 11月9日更新</div><div class="doc-footer"><button class="state draft">● 草稿</button><button class="open-link">打开 ›</button></div></div></article>
+          </div>
+        </section>
+
+        <section class="section activity-grid">
+          <div class="panel"><div class="section-title"><h2>快速操作</h2><p>常用的课室工具都放在这里</p></div><div class="quick-list"><button class="quick" id="quickUpload"><span class="qicon">⇧</span><b>上传资料</b><span>加入新的 PDF</span></button><button class="quick" id="quickRoster"><span class="qicon">♟</span><b>管理名单</b><span>输入或导入 CSV</span></button><button class="quick"><span class="qicon">⌁</span><b>分享课室</b><span>链接与二维码</span></button></div></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="editorView">
+    <header class="editor-top">
+      <div class="editor-left"><button class="back-btn" id="backBtn">←</button><div class="logo-crop" style="width:39px;height:39px;border-radius:12px"><img src="assets/cat-logo.jpeg" alt="Logo"></div><div class="file-name"><b id="editorTitle">第一课：人物描写</b><span>初二华文 A 班 · 第 1 / 12 页</span></div></div>
+      <div class="editor-right"><span class="save-state" id="saveState">✓ 已保存到本机</span><button class="interaction-btn" id="editorWheel" title="在当前文档中打开随机点名">◉ 随机点名</button><select class="permission-select" id="permission"><option>✎ 访客可修改</option><option>▣ 锁定</option><option>● 草稿／隐藏</option></select><button class="secondary" id="shareBtn">分享</button></div>
+    </header>
+    <div class="editor-shell">
+      <aside class="toolbar">
+        <button class="tool active" data-tool="hand"><strong>☝</strong>移动缩放</button><button class="tool" data-tool="pen"><strong>✎</strong>画笔</button><button class="tool" data-tool="highlighter"><strong>▰</strong>荧光笔</button><button class="tool" data-tool="eraser"><strong>◇</strong>整笔擦除</button><button class="tool" data-tool="select"><strong>⬚</strong>框选</button><button class="tool" id="deleteSelected" disabled title="先框选字迹" style="opacity:.45"><strong>✕</strong>删除选中</button><div class="tool-sep"></div><button class="tool" id="undoBtn"><strong>↶</strong>撤销</button><button class="tool" id="redoBtn"><strong>↷</strong>重做</button><button class="tool" id="clearBtn"><strong>⌫</strong>清除</button>
+      </aside>
+      <main class="canvas-stage" id="canvasStage"><div class="canvas-controls"><button id="zoomOut">−</button><span id="zoomLabel">100%</span><button id="zoomIn">＋</button><button id="fitPage" title="适合页面">⌗</button><button id="prevPage">‹</button><span id="pageLabel">1 / 12</span><button id="nextPage">›</button></div><div class="pdf-sheet" id="pdfSheet"><canvas id="pdfCanvas"></canvas><div class="pdf-content"><div class="eyebrow">第一课</div><h2>人物描写：让人物“活”起来</h2><div class="lead">学习目标：通过动作、语言和神态描写刻画人物。</div><div class="lesson-box"><b>例句</b><p>他轻轻推开教室的门，探进半个脑袋，确认老师还没来，才长长地松了一口气。</p></div><p class="pdf-p">想一想：这段文字通过哪些动作表现人物的心情？请在句子下方画线，并在旁边写出你的看法。</p></div><canvas id="drawCanvas"></canvas></div></main>
+      <aside class="editor-panel"><div class="side-section"><h3>画笔颜色</h3><div class="colors"><button class="color selected" style="background:#58a9df" data-color="#58a9df"></button><button class="color" style="background:#182336" data-color="#182336"></button><button class="color" style="background:#ea6d73" data-color="#ea6d73"></button><button class="color" style="background:#f1bd45" data-color="#f1bd45"></button><button class="color" style="background:#36ad7a" data-color="#36ad7a"></button><button class="color" style="background:#936fd0" data-color="#936fd0"></button></div><div class="range-row"><label><span>笔画粗细</span><span id="sizeLabel">4 px</span></label><input id="sizeRange" type="range" min="2" max="24" value="4"></div></div><div class="side-section"><h3>书写提示</h3><div class="history-item">移动缩放：单指拖动，双指捏合放大。</div><div class="history-item">框选后可拖动字迹，或按 Delete 删除。</div><div class="history-item">整笔擦除：轻触某一笔即可删除。</div></div><div class="side-section"><h3>保存位置</h3><p style="color:var(--muted);font-size:11px;line-height:1.6">此试用版保存在当前浏览器。清除网站资料会移除 PDF 与批注。</p></div></aside>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="uploadModal"><div class="modal"><div class="modal-head"><div><h3>上传 PDF 资料</h3><p>文件会保存在这台电脑的浏览器中，上传后先设为草稿。</p></div><button class="close" data-close>×</button></div><label class="dropzone" for="pdfFile"><div><strong>⇧</strong><b>选择 PDF 文件</b><p>单个文件不超过 100 MB</p></div></label><input id="pdfFile" type="file" accept="application/pdf,.pdf" hidden><div class="modal-actions"><button class="secondary" data-close>取消</button><button class="primary" id="fakeUpload">选择 PDF</button></div></div></div>
+  <div class="modal-backdrop" id="rosterModal"><div class="modal"><div class="modal-head"><div><h3>学生名单</h3><p>每行一位学生。也可以导入包含姓名的 CSV 文件。</p></div><button class="close" data-close>×</button></div><textarea id="rosterText" aria-label="学生名单" style="width:100%;min-height:220px;margin-top:16px;border:1px solid var(--line);border-radius:14px;padding:13px;resize:vertical;line-height:1.7"></textarea><input id="rosterFile" type="file" accept=".csv,text/csv" hidden><div class="modal-actions" style="justify-content:space-between"><button class="secondary" id="importRoster">导入 CSV</button><div><button class="secondary" data-close>取消</button> <button class="primary" id="saveRoster">保存名单</button></div></div></div></div>
+  <div class="modal-backdrop" id="wheelModal"><div class="modal wheel-modal"><div class="modal-head"><div><h3>随机点名</h3><p>姓名滚动出现，停下时揭晓获选学生。</p></div><button class="close" data-close>×</button></div><div class="reel-intro"><span class="reel-count" id="reelCount">参与抽选 · 0 人</span><span class="reel-hint">每位学生都有相同的获选机会</span></div><div class="reel-shell"><div class="reel-window" id="reelWindow"><div class="reel-focus"></div><div class="reel-track" id="reelTrack" aria-hidden="true"></div></div></div><div class="reel-footer"><div class="wheel-subtitle" id="wheelSubtitle" aria-live="polite">点击开始，让名字滚动起来</div><div class="modal-actions" style="margin:0;align-items:center"><button class="secondary" id="soundToggle" aria-pressed="true">♫ 音效开</button><button class="primary" id="spinAgain">开始抽选</button></div></div><div id="winner" class="sr-only" aria-live="polite"></div></div></div>
+  <div class="toast" id="toast">已完成</div>
+
+  <script>
+    const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+    const toast = msg => { const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(window.__toast); window.__toast=setTimeout(()=>t.classList.remove('show'),1800); };
+    const openModal = id => $(id).classList.add('show');
+    const closeModals = () => { $$('.modal-backdrop').forEach(m=>m.classList.remove('show'));window.stopWheel?.(); };
+    $('#uploadBtn').onclick=$('#quickUpload').onclick=()=>openModal('#uploadModal');
+    $('#editorWheel').onclick=()=>{openModal('#wheelModal');setupReel(students)};
+    $$('[data-close]').forEach(b=>b.onclick=closeModals);
+    $$('.modal-backdrop').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModals()}));
+    $('#fakeUpload').onclick=()=>$('#pdfFile').click();
+    $('#blankBtn').onclick=()=>toast('白板功能将在后续版本加入');
+    $('#copyCode').onclick=()=>toast('免登录分享需要云端服务');
+    $$('.chip').forEach(c=>c.onclick=()=>{$$('.chip').forEach(x=>x.classList.remove('active'));c.classList.add('active')});
+    $$('.state').forEach(s=>s.onclick=e=>{e.stopPropagation(); if(s.classList.contains('editable')){s.className='state locked';s.textContent='▣ 已锁定';toast('这份 PDF 已锁定')}else if(s.classList.contains('locked')){s.className='state editable';s.textContent='✎ 访客可修改';toast('访客现在可以修改这份 PDF')}});
+    const showEditor = (title,id) => { $('#dashboardView').style.display='none';$('#editorView').style.display='block';$('#editorTitle').textContent=title;requestAnimationFrame(()=>{resizeCanvas();window.openDocument?.(title,id)}); };
+    $$('.doc-card').forEach(c=>c.onclick=()=>showEditor(c.dataset.title));
+    $('#backBtn').onclick=()=>{$('#editorView').style.display='none';$('#dashboardView').style.display='grid'};
+    $('#permission').onchange=e=>toast(e.target.value.includes('锁定')?'已锁定，访客只能查看':'文档权限已更新');
+    $('#shareBtn').onclick=()=>toast('分享链接需要云端服务');
+    let students=['林伟杰','陈欣怡','黄子轩','李嘉恩','吴俊豪','张慧敏'];
+    let spinning=false, soundOn=true, audioContext, spinTimer, tickTimer;
+    function note(frequency,duration=.055,volume=.045,type='sine'){
+      if(!soundOn)return;
+      try {audioContext ||= new (window.AudioContext||window.webkitAudioContext)();audioContext.resume();const oscillator=audioContext.createOscillator(),gain=audioContext.createGain(),now=audioContext.currentTime;oscillator.type=type;oscillator.frequency.value=frequency;gain.gain.setValueAtTime(volume,now);gain.gain.exponentialRampToValueAtTime(.001,now+duration);oscillator.connect(gain).connect(audioContext.destination);oscillator.start(now);oscillator.stop(now+duration)} catch {}
+    }
+    function reelRow(name){const row=document.createElement('div');row.className='reel-row';row.textContent=name;row.title=name;return row}
+    function setupReel(names){
+      $('#reelCount').textContent=`参与抽选 · ${names.length} 人`;
+      $('#reelWindow').classList.remove('finished');
+      const track=$('#reelTrack');track.style.transition='none';track.style.transform='translateY(0)';
+      track.replaceChildren(reelRow(''),reelRow(names.length?'准备好了吗？':'请先添加学生'),reelRow(''));
+      $('#wheelSubtitle').textContent=names.length?'点击开始，让名字滚动起来':'请先到学生名单中添加学生';
+      $('#winner').textContent='';
+      $('#spinAgain').disabled=!names.length;$('#spinAgain').textContent='开始抽选';
+    }
+    function spin(){
+      if(spinning)return;
+      if(!students.length)return toast('请先输入学生名单');
+      note(440,.12,.055,'triangle');
+      spinning=true;const button=$('#spinAgain'),track=$('#reelTrack'),windowEl=$('#reelWindow');button.disabled=true;button.textContent='抽选中…';windowEl.classList.remove('finished');
+      const chosenIndex=Math.floor(Math.random()*students.length),picked=students[chosenIndex],steps=34+Math.floor(Math.random()*8);
+      const start=(chosenIndex-steps%students.length+students.length)%students.length;
+      const rows=document.createDocumentFragment();
+      for(let i=0;i<=steps+2;i++)rows.append(reelRow(students[(start+i-1+students.length)%students.length]));
+      track.style.transition='none';track.style.transform='translateY(0)';track.replaceChildren(rows);
+      $('#winner').textContent='';$('#wheelSubtitle').textContent='名字正在滚动…';
+      void track.offsetHeight;
+      requestAnimationFrame(()=>{if(!spinning)return;track.style.transition='transform 5.2s cubic-bezier(.12,.7,.08,1)';track.style.transform=`translateY(-${steps*82}px)`});
+      const started=performance.now();
+      function ticking(){if(!spinning)return;const elapsed=performance.now()-started;note(390+Math.min(180,elapsed/30),.035,.025,'triangle');tickTimer=setTimeout(ticking,100+Math.pow(Math.min(elapsed/5200,1),3)*300)}
+      ticking();
+      spinTimer=setTimeout(()=>{
+        if(!spinning)return;
+        spinning=false;clearTimeout(tickTimer);windowEl.classList.add('finished');
+        $('#wheelSubtitle').textContent=`抽中了 ${picked}！`;$('#winner').textContent=`抽中了 ${picked}`;
+        note(523,.25,.08);setTimeout(()=>note(659,.3,.08),120);setTimeout(()=>note(784,.45,.08),240);
+        button.disabled=false;button.textContent='再抽一次';
+      },5350);
+    }
+    $('#spinAgain').onclick=spin;
+    $('#soundToggle').onclick=()=>{soundOn=!soundOn;$('#soundToggle').textContent=soundOn?'♫ 音效开':'♪ 音效关';$('#soundToggle').setAttribute('aria-pressed',String(soundOn))};
+    window.stopWheel=()=>{if(!spinning)return;spinning=false;clearTimeout(spinTimer);clearTimeout(tickTimer);setupReel(students)};
+
+    // Each pen movement is a separate stroke, so it can be selected, moved or erased whole.
+    const canvas=$('#drawCanvas'), ctx=canvas.getContext('2d'), sheet=$('#pdfSheet');
+    let tool='hand', color='#58a9df', size=4, strokes=[], selected=[], selectionBox=null, gesture=null, undo=[], redo=[];
+    let zoom=1, panX=0, panY=0, panStart=null, pointers=new Map(), pinchStart=null;
+    function applyView(){ sheet.style.transform=`translate(${panX}px, ${panY}px) scale(${zoom})`; $('#zoomLabel').textContent=Math.round(zoom*100)+'%'; }
+    function setZoom(next){ zoom=Math.max(.65,Math.min(3,next)); if(zoom===1){panX=0;panY=0} applyView(); }
+    $('#zoomIn').onclick=()=>setZoom(zoom+.2); $('#zoomOut').onclick=()=>setZoom(zoom-.2); $('#fitPage').onclick=()=>{zoom=1;panX=panY=0;applyView();toast('已恢复适合页面')};
+    function redraw(){
+      const dpr=window.devicePixelRatio||1, w=sheet.clientWidth, h=sheet.clientHeight;
+      ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+      for(const s of strokes){
+        if(!s.points.length)continue;
+        ctx.beginPath(); ctx.lineCap='round'; ctx.lineJoin='round'; ctx.lineWidth=s.kind==='highlighter'?s.size*4:s.size;
+        ctx.strokeStyle=s.color; ctx.globalAlpha=s.kind==='highlighter'?.3:1;
+        ctx.moveTo(s.points[0].x,s.points[0].y);
+        for(const p of s.points.slice(1))ctx.lineTo(p.x,p.y);
+        if(s.points.length===1){const p=s.points[0];ctx.lineTo(p.x+.01,p.y+.01)}
+        ctx.stroke();
+      }
+      ctx.globalAlpha=1;
+      if(selected.length){const b=bounds(selected.flatMap(s=>s.points));ctx.setLineDash([6,4]);ctx.strokeStyle='#287fba';ctx.lineWidth=1.5;ctx.strokeRect(b.x-9,b.y-9,b.w+18,b.h+18);ctx.setLineDash([])}
+      if(selectionBox){const b=rect(selectionBox.start,selectionBox.end);ctx.fillStyle='rgba(88,169,223,.12)';ctx.strokeStyle='#287fba';ctx.lineWidth=1.5;ctx.setLineDash([6,4]);ctx.fillRect(b.x,b.y,b.w,b.h);ctx.strokeRect(b.x,b.y,b.w,b.h);ctx.setLineDash([])}
+    }
+    function resizeCanvas(){
+      const w=sheet.clientWidth,h=sheet.clientHeight,oldW=Number(canvas.dataset.w)||w,oldH=Number(canvas.dataset.h)||h,dpr=window.devicePixelRatio||1;
+      if(oldW!==w||oldH!==h)for(const s of strokes)for(const p of s.points){p.x*=w/oldW;p.y*=h/oldH}
+      canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);canvas.style.width=w+'px';canvas.style.height=h+'px';canvas.dataset.w=w;canvas.dataset.h=h;redraw();
+    }
+    window.addEventListener('resize',()=>{if($('#editorView').style.display==='block')resizeCanvas()});
+    function point(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*(canvas.clientWidth/r.width),y:(e.clientY-r.top)*(canvas.clientHeight/r.height)}}
+    const clone=()=>JSON.parse(JSON.stringify(strokes));
+    function save(before){undo.push(before||clone());if(undo.length>30)undo.shift();redo=[];$('#saveState').textContent='保存中…';const task=window.saveDocumentState?.();Promise.resolve(task).then(()=>$('#saveState').textContent='✓ 已保存到本机').catch(()=>$('#saveState').textContent='保存失败')}
+    function bounds(pts){if(!pts.length)return{x:0,y:0,w:0,h:0};const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y),x=Math.min(...xs),y=Math.min(...ys);return{x,y,w:Math.max(...xs)-x,h:Math.max(...ys)-y}}
+    function rect(a,b){return{x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.abs(a.x-b.x),h:Math.abs(a.y-b.y)}}
+    function inside(p,b,pad=0){return p.x>=b.x-pad&&p.x<=b.x+b.w+pad&&p.y>=b.y-pad&&p.y<=b.y+b.h+pad}
+    function segmentDistance(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)}
+    function strokeHit(s,p){const pts=s.points, radius=Math.max(10,s.size*(s.kind==='highlighter'?2:1));if(pts.length===1)return Math.hypot(p.x-pts[0].x,p.y-pts[0].y)<radius;for(let i=1;i<pts.length;i++)if(segmentDistance(p,pts[i-1],pts[i])<radius)return true;return false}
+    function selectInBox(b){return strokes.filter(s=>s.points.some(p=>inside(p,b))||s.points.some((p,i)=>i>0&&segmentIntersectsRect(s.points[i-1],p,b)))}
+    function segmentIntersectsRect(a,c,b){if(inside(a,b)||inside(c,b))return true;const edges=[[{x:b.x,y:b.y},{x:b.x+b.w,y:b.y}],[{x:b.x+b.w,y:b.y},{x:b.x+b.w,y:b.y+b.h}],[{x:b.x+b.w,y:b.y+b.h},{x:b.x,y:b.y+b.h}],[{x:b.x,y:b.y+b.h},{x:b.x,y:b.y}]];return edges.some(([d,e])=>{const cross=(u,v,w)=>(v.x-u.x)*(w.y-u.y)-(v.y-u.y)*(w.x-u.x);return cross(a,c,d)*cross(a,c,e)<=0&&cross(d,e,a)*cross(d,e,c)<=0})}
+    function updateSelection(){const b=$('#deleteSelected');b.disabled=!selected.length;b.style.opacity=selected.length?'1':'.45';redraw()}
+    function eraseAt(p){const hit=strokes.findLast(s=>strokeHit(s,p));if(!hit)return;if(!gesture.changed){gesture.before=clone();gesture.changed=true}strokes=strokes.filter(s=>s!==hit);selected=selected.filter(s=>s!==hit);updateSelection()}
+    canvas.addEventListener('pointerdown',e=>{
+      pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture(e.pointerId);
+      if(pointers.size===2){if(gesture?.kind==='draw'&&gesture.stroke.points.length<2)strokes.pop();gesture=null;selectionBox=null;redraw();const a=[...pointers.values()];pinchStart={distance:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),zoom,midX:(a[0].x+a[1].x)/2,midY:(a[0].y+a[1].y)/2,panX,panY};return}
+      const p=point(e);
+      if(tool==='hand'){panStart={x:e.clientX,y:e.clientY,panX,panY};return}
+      if(tool==='select'){
+        if(selected.length&&inside(p,bounds(selected.flatMap(s=>s.points)),12)){gesture={kind:'move',last:p,before:clone(),changed:false};return}
+        selected=[];selectionBox={start:p,end:p};gesture={kind:'select'};updateSelection();return;
+      }
+      if(tool==='eraser'){gesture={kind:'erase',changed:false};eraseAt(p);return}
+      selected=[];const stroke={kind:tool,color,size,points:[p]};const before=clone();strokes.push(stroke);gesture={kind:'draw',stroke,before};updateSelection();
+    });
+    canvas.addEventListener('pointermove',e=>{
+      if(pointers.has(e.pointerId))pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      if(pointers.size>=2&&pinchStart){const a=[...pointers.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),mx=(a[0].x+a[1].x)/2,my=(a[0].y+a[1].y)/2;zoom=Math.max(.65,Math.min(3,pinchStart.zoom*d/pinchStart.distance));panX=pinchStart.panX+mx-pinchStart.midX;panY=pinchStart.panY+my-pinchStart.midY;applyView();return}
+      if(tool==='hand'&&panStart){panX=panStart.panX+e.clientX-panStart.x;panY=panStart.panY+e.clientY-panStart.y;applyView();return}
+      if(!gesture)return;const p=point(e);
+      if(gesture.kind==='draw')gesture.stroke.points.push(p);
+      if(gesture.kind==='erase')eraseAt(p);
+      if(gesture.kind==='select')selectionBox.end=p;
+      if(gesture.kind==='move'){const dx=p.x-gesture.last.x,dy=p.y-gesture.last.y;for(const s of selected)for(const q of s.points){q.x+=dx;q.y+=dy}gesture.last=p;gesture.changed=true}
+      redraw();
+    });
+    function stop(e){pointers.delete(e.pointerId);if(pointers.size<2)pinchStart=null;if(!pointers.size)panStart=null;if(!gesture)return;
+      if(gesture.kind==='select'){const b=rect(selectionBox.start,selectionBox.end);selected=b.w<5&&b.h<5?strokes.filter(s=>strokeHit(s,selectionBox.end)).slice(-1):selectInBox(b);selectionBox=null;updateSelection();if(selected.length)toast(`已选中 ${selected.length} 笔，可拖动或删除`)}
+      if(gesture.kind==='draw'||gesture.changed)save(gesture.before);
+      gesture=null;redraw();
+    }
+    canvas.addEventListener('pointerup',stop);canvas.addEventListener('pointercancel',stop);
+    $$('.tool[data-tool]').forEach(b=>b.onclick=()=>{$$('.tool[data-tool]').forEach(x=>x.classList.remove('active'));b.classList.add('active');tool=b.dataset.tool;gesture=null;selectionBox=null;if(tool!=='select')selected=[];updateSelection();canvas.style.cursor=tool==='hand'?'grab':tool==='eraser'?'cell':tool==='select'?'default':'crosshair';if(tool==='eraser')toast('点到或划过字迹，即删除整笔')});
+    $$('.color').forEach(b=>b.onclick=()=>{$$('.color').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');color=b.dataset.color});
+    $('#sizeRange').oninput=e=>{size=+e.target.value;$('#sizeLabel').textContent=size+' px'};
+    function deleteSelected(){if(!selected.length)return toast('请先框选字迹');const before=clone();strokes=strokes.filter(s=>!selected.includes(s));selected=[];save(before);updateSelection();toast('选中的字迹已删除，可撤销')}
+    $('#deleteSelected').onclick=deleteSelected;
+    document.addEventListener('keydown',e=>{if($('#editorView').style.display!=='block')return;if((e.key==='Delete'||e.key==='Backspace')&&selected.length){e.preventDefault();deleteSelected()}});
+    $('#undoBtn').onclick=()=>{if(!undo.length)return toast('没有可以撤销的内容');redo.push(clone());strokes=undo.pop();selected=[];updateSelection();window.saveDocumentState?.();toast('已撤销')};
+    $('#redoBtn').onclick=()=>{if(!redo.length)return toast('没有可以重做的内容');undo.push(clone());strokes=redo.pop();selected=[];updateSelection();window.saveDocumentState?.();toast('已重做')};
+    $('#clearBtn').onclick=()=>{if(!strokes.length)return toast('本页没有批注');const before=clone();strokes=[];selected=[];save(before);updateSelection();toast('本页批注已清除，可撤销')};
+    window.editorAPI={
+      getStrokes:()=>clone(),
+      setStrokes:value=>{strokes=Array.isArray(value)?value:[];selected=[];undo=[];redo=[];resizeCanvas()},
+      setStudents:value=>{students=value;if(!spinning)setupReel(students)},
+      resize:resizeCanvas,
+      toast,openModal,closeModals,showEditor
+    };
+  </script>
+  <script type="module" src="assets/app.mjs"></script>
+</body>
+</html>
