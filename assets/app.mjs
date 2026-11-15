@@ -9,7 +9,7 @@ const rosterKey = 'cloud-classroom-roster-v1';
 const exampleStudents = ['林伟杰','陈欣怡','黄子轩','李嘉恩','吴俊豪','张慧敏'];
 let records = readJSON(recordsKey, []);
 let roster = readJSON(rosterKey, exampleStudents);
-let current = null, pageNumber = 1, pdf = null, renderTask = null;
+let current = null, pageNumber = 1, pageOrder = [1], pdf = null, renderTask = null;
 let dbPromise;
 
 function readJSON(key, fallback) {
@@ -42,7 +42,31 @@ async function get(key) {
     request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
   });
 }
-function inkKey() { return `ink:${current?.id ?? current?.title}:${pageNumber}`; }
+async function remove(key) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('items', 'readwrite');
+    tx.objectStore('items').delete(key);
+    tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+  });
+}
+function pageRef() { return pageOrder[pageNumber - 1] ?? 1; }
+function inkKey() {
+  const ref = pageRef();
+  return `ink:${current?.id ?? current?.title}:${typeof ref === 'number' ? ref : ref.id}`;
+}
+function sampleOrderKey() { return `cloud-classroom-sample-pages-v1:${current.title}`; }
+function persistPageOrder() {
+  if (current.id) {
+    current.pageOrder = pageOrder;
+    current.pages = pageOrder.length;
+    persistRecords();
+    const meta = document.querySelector(`[data-id="${current.id}"] .doc-meta`);
+    if (meta) meta.textContent = `${pageOrder.length} 页 · 本机保存`;
+  } else {
+    localStorage.setItem(sampleOrderKey(), JSON.stringify(pageOrder));
+  }
+}
 window.saveDocumentState = () => {
   if (!current) return Promise.resolve();
   const key = inkKey(), value = api.getStrokes();
@@ -127,17 +151,19 @@ byId('permission').onchange = event => {
 };
 
 async function renderPage() {
-  const visiblePdf = !!pdf;
+  const ref = pageRef();
+  const visiblePdf = !!pdf && typeof ref === 'number';
   byId('pdfCanvas').style.display = visiblePdf ? 'block' : 'none';
-  document.querySelector('.pdf-content').style.display = visiblePdf ? 'none' : 'block';
-  byId('pageLabel').textContent = `${pageNumber} / ${pdf?.numPages || 1}`;
-  document.querySelector('.file-name span').textContent = `初二华文 A 班 · 第 ${pageNumber} / ${pdf?.numPages || 1} 页`;
+  document.querySelector('.pdf-content').style.display = !pdf && typeof ref === 'number' ? 'block' : 'none';
+  byId('pageLabel').textContent = `${pageNumber} / ${pageOrder.length}`;
+  document.querySelector('.file-name span').textContent = `初二华文 A 班 · 第 ${pageNumber} / ${pageOrder.length} 页${typeof ref === 'number' ? '' : ' · 空白页'}`;
+  byId('deleteBlankPage').disabled = typeof ref === 'number';
   if (!pdf) {
     const sheet = byId('pdfSheet');
     sheet.style.width = '';sheet.style.height = '';sheet.style.aspectRatio = '1.414 / 1';
     api.resize();return;
   }
-  const page = await pdf.getPage(pageNumber), viewport = page.getViewport({scale:1});
+  const page = await pdf.getPage(typeof ref === 'number' ? ref : ref.base), viewport = page.getViewport({scale:1});
   const sheet = byId('pdfSheet'), stage = byId('canvasStage');
   // PDF.js reports page dimensions in points. 96 / 72 maps them to CSS pixels.
   // When the display is smaller, reduce both dimensions by the same factor.
@@ -149,6 +175,7 @@ async function renderPage() {
   sheet.style.height = `${height}px`;
   sheet.style.aspectRatio = 'auto';
   api.resize();
+  if (!visiblePdf) return;
   const canvas = byId('pdfCanvas');
   const scale = width / viewport.width, pixelRatio = window.devicePixelRatio || 1;
   const size = page.getViewport({scale:scale * pixelRatio});
@@ -162,25 +189,55 @@ async function loadInk() {
 }
 window.openDocument = async (title,id) => {
   current = (id && records.find(item => item.id === id)) || {title, status:'可修改'};
-  pageNumber = 1;pdf = null;api.setStrokes([]);syncPermission();
+  pageNumber = 1;pageOrder = [1];pdf = null;api.setStrokes([]);syncPermission();
   if (current.id) {
     try {
       const blob = await get(`file:${current.id}`);
       if (!blob) throw Error('文件不存在');
       const bytes = new Uint8Array(await blob.arrayBuffer());
       pdf = await pdfjs.getDocument({data:bytes}).promise;
-      if (current.pages !== pdf.numPages) {current.pages = pdf.numPages;persistRecords();document.querySelector(`[data-id="${current.id}"] .doc-meta`).textContent = `${pdf.numPages} 页 · 本机保存`;}
+      pageOrder = Array.isArray(current.pageOrder) && current.pageOrder.length
+        ? current.pageOrder : Array.from({length:pdf.numPages},(_,index)=>index+1);
+      if (current.pages !== pageOrder.length) persistPageOrder();
     } catch(error) {console.error(error);api.toast('PDF 无法读取，请重新上传')}
+  } else {
+    pageOrder = readJSON(sampleOrderKey(), [1]);
   }
   await renderPage();await loadInk();
 };
 async function changePage(delta) {
   if (!current) return;
-  const next = Math.max(1,Math.min(pdf?.numPages || 1,pageNumber+delta));
+  const next = Math.max(1,Math.min(pageOrder.length,pageNumber+delta));
   if (next === pageNumber) return;
-  window.saveDocumentState();pageNumber = next;api.setStrokes([]);
+  await window.saveDocumentState();pageNumber = next;api.setStrokes([]);
   await renderPage();await loadInk();
 }
 byId('prevPage').onclick = () => changePage(-1);
 byId('nextPage').onclick = () => changePage(1);
+byId('addBlankPage').onclick = async () => {
+  if (!current) return;
+  await window.saveDocumentState();
+  const ref = pageRef();
+  const base = typeof ref === 'number' ? ref : ref.base;
+  pageOrder.splice(pageNumber, 0, {id:`blank-${crypto.randomUUID()}`, base});
+  persistPageOrder();
+  pageNumber += 1;
+  api.setStrokes([]);
+  await renderPage();
+  await loadInk();
+  api.toast('已在当前页后插入空白页');
+};
+byId('deleteBlankPage').onclick = async () => {
+  const ref = pageRef();
+  if (!current || typeof ref === 'number') return;
+  if (!window.confirm('删除这张空白页及其笔迹？')) return;
+  await remove(inkKey());
+  pageOrder.splice(pageNumber - 1, 1);
+  pageNumber = Math.min(pageNumber, pageOrder.length);
+  persistPageOrder();
+  api.setStrokes([]);
+  await renderPage();
+  await loadInk();
+  api.toast('空白页已删除');
+};
 window.addEventListener('resize', () => {if (byId('editorView').style.display === 'block' && pdf) renderPage().catch(console.error)});
