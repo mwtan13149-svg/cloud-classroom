@@ -157,8 +157,10 @@
     .tool.active strong { color: var(--blue-deep); }
     .tool-sep { height: 1px; width: 48px; background: var(--line); margin: 3px 0; }
     .canvas-stage { overflow: auto; padding: 28px 35px 50px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
-    .canvas-controls { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.95); border: 1px solid var(--line); border-radius: 13px; padding: 6px 9px; box-shadow: 0 5px 16px rgba(34,59,78,.08); }
+    .canvas-controls { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; max-width: 100%; background: rgba(255,255,255,.95); border: 1px solid var(--line); border-radius: 13px; padding: 6px 9px; box-shadow: 0 5px 16px rgba(34,59,78,.08); }
     .canvas-controls button { width: 30px; height: 30px; border: 0; border-radius: 8px; background: #f3f6f9; }
+    .canvas-controls .page-action { width: auto; padding: 0 10px; white-space: nowrap; font-size: 11px; font-weight: 700; }
+    .canvas-controls .page-action:disabled { opacity: .4; cursor: not-allowed; }
     .canvas-controls span { font-size: 11px; color: var(--muted); min-width: 48px; text-align: center; }
     .pdf-sheet { width: min(800px, 84vw); aspect-ratio: 1.414/1; flex: 0 0 auto; background: #fff; box-shadow: 0 16px 45px rgba(30,50,68,.17); position: relative; border-radius: 3px; overflow: hidden; touch-action: none; transform-origin: center center; will-change: transform; }
     .pdf-content { position: absolute; inset: 0; padding: 8% 9%; pointer-events: none; }
@@ -243,7 +245,6 @@
       <nav>
         <button class="nav-item active"><span class="nav-icon">⌂</span>课室主页</button>
         <button class="nav-item"><span class="nav-icon">▤</span>PDF 资料</button>
-        <button class="nav-item"><span class="nav-icon">✎</span>白板</button>
         <button class="nav-item" id="rosterNav"><span class="nav-icon">♟</span>学生名单</button>
         <button class="nav-item"><span class="nav-icon">⚙</span>课室设置</button>
       </nav>
@@ -260,8 +261,8 @@
         <section class="hero">
           <div class="welcome">
             <div class="eyebrow">CLASSROOM SPACE</div><h1>初二华文 A 班</h1>
-            <p>集中管理课室里的所有 PDF、共享批注与学生名单。开放需要讨论的资料，其他文档则保持锁定。</p>
-            <div class="hero-buttons"><button class="primary" id="uploadBtn">＋ 上传 PDF</button><button class="secondary" id="blankBtn">✎ 新建白板</button></div>
+            <p>集中管理课室里的 PDF、书写批注与学生名单。需要更多书写空间时，可在 PDF 内插入空白页。</p>
+            <div class="hero-buttons"><button class="primary" id="uploadBtn">＋ 上传 PDF</button></div>
             <div class="welcome-cat"><img src="assets/cat-logo.jpeg" alt=""></div>
           </div>
           <div class="stats-card">
@@ -296,7 +297,7 @@
       <aside class="toolbar">
         <button class="tool active" data-tool="hand"><strong>☝</strong>移动缩放</button><button class="tool" data-tool="pen"><strong>✎</strong>画笔</button><button class="tool" data-tool="highlighter"><strong>▰</strong>荧光笔</button><button class="tool" data-tool="eraser"><strong>◇</strong>整笔擦除</button><button class="tool" data-tool="select"><strong>⬚</strong>框选</button><button class="tool" id="deleteSelected" disabled title="先框选字迹" style="opacity:.45"><strong>✕</strong>删除选中</button><div class="tool-sep"></div><button class="tool" id="undoBtn"><strong>↶</strong>撤销</button><button class="tool" id="redoBtn"><strong>↷</strong>重做</button><button class="tool" id="clearBtn"><strong>⌫</strong>清除</button>
       </aside>
-      <main class="canvas-stage" id="canvasStage"><div class="canvas-controls"><button id="zoomOut">−</button><span id="zoomLabel">100%</span><button id="zoomIn">＋</button><button id="fitPage" title="适合页面">⌗</button><button id="prevPage">‹</button><span id="pageLabel">1 / 12</span><button id="nextPage">›</button></div><div class="pdf-sheet" id="pdfSheet"><canvas id="pdfCanvas"></canvas><div class="pdf-content"><div class="eyebrow">第一课</div><h2>人物描写：让人物“活”起来</h2><div class="lead">学习目标：通过动作、语言和神态描写刻画人物。</div><div class="lesson-box"><b>例句</b><p>他轻轻推开教室的门，探进半个脑袋，确认老师还没来，才长长地松了一口气。</p></div><p class="pdf-p">想一想：这段文字通过哪些动作表现人物的心情？请在句子下方画线，并在旁边写出你的看法。</p></div><canvas id="drawCanvas"></canvas></div></main>
+      <main class="canvas-stage" id="canvasStage"><div class="canvas-controls"><button id="zoomOut">−</button><span id="zoomLabel">100%</span><button id="zoomIn">＋</button><button id="fitPage" title="适合页面">⌗</button><button id="prevPage">‹</button><span id="pageLabel">1 / 12</span><button id="nextPage">›</button><button class="page-action" id="addBlankPage" title="在当前页后插入空白页">＋ 空白页</button><button class="page-action" id="deleteBlankPage" title="删除当前空白页" disabled>删除空白页</button></div><div class="pdf-sheet" id="pdfSheet"><canvas id="pdfCanvas"></canvas><div class="pdf-content"><div class="eyebrow">第一课</div><h2>人物描写：让人物“活”起来</h2><div class="lead">学习目标：通过动作、语言和神态描写刻画人物。</div><div class="lesson-box"><b>例句</b><p>他轻轻推开教室的门，探进半个脑袋，确认老师还没来，才长长地松了一口气。</p></div><p class="pdf-p">想一想：这段文字通过哪些动作表现人物的心情？请在句子下方画线，并在旁边写出你的看法。</p></div><canvas id="drawCanvas"></canvas></div></main>
       <aside class="editor-panel"><div class="side-section"><h3>画笔颜色</h3><div class="colors"><button class="color selected" style="background:#58a9df" data-color="#58a9df"></button><button class="color" style="background:#182336" data-color="#182336"></button><button class="color" style="background:#ea6d73" data-color="#ea6d73"></button><button class="color" style="background:#f1bd45" data-color="#f1bd45"></button><button class="color" style="background:#36ad7a" data-color="#36ad7a"></button><button class="color" style="background:#936fd0" data-color="#936fd0"></button></div><div class="range-row"><label><span>笔画粗细</span><span id="sizeLabel">4 px</span></label><input id="sizeRange" type="range" min="2" max="24" value="4"></div></div><div class="side-section"><h3>书写提示</h3><div class="history-item">移动缩放：单指拖动，双指捏合放大。</div><div class="history-item">框选后可拖动字迹，或按 Delete 删除。</div><div class="history-item">整笔擦除：轻触某一笔即可删除。</div></div><div class="side-section"><h3>保存位置</h3><p style="color:var(--muted);font-size:11px;line-height:1.6">此试用版保存在当前浏览器。清除网站资料会移除 PDF 与批注。</p></div></aside>
     </div>
   </div>
@@ -316,7 +317,6 @@
     $$('[data-close]').forEach(b=>b.onclick=closeModals);
     $$('.modal-backdrop').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModals()}));
     $('#fakeUpload').onclick=()=>$('#pdfFile').click();
-    $('#blankBtn').onclick=()=>toast('白板功能将在后续版本加入');
     $('#copyCode').onclick=()=>toast('免登录分享需要云端服务');
     $$('.chip').forEach(c=>c.onclick=()=>{$$('.chip').forEach(x=>x.classList.remove('active'));c.classList.add('active')});
     $$('.state').forEach(s=>s.onclick=e=>{e.stopPropagation(); if(s.classList.contains('editable')){s.className='state locked';s.textContent='▣ 已锁定';toast('这份 PDF 已锁定')}else if(s.classList.contains('locked')){s.className='state editable';s.textContent='✎ 访客可修改';toast('访客现在可以修改这份 PDF')}});
