@@ -212,6 +212,15 @@
     .dropzone { margin-top: 18px; border: 2px dashed #cfe5f3; border-radius: 18px; background: #f7fbfe; min-height: 180px; display: grid; place-items: center; text-align: center; padding: 20px; color: #5c7488; }
     .dropzone strong { display: block; font-size: 28px; margin-bottom: 7px; }
     .modal-actions { display: flex; justify-content: end; gap: 9px; margin-top: 17px; }
+    .export-guide { margin-top: 20px; display: grid; gap: 10px; }
+    .export-step { display: flex; gap: 12px; align-items: start; padding: 13px 14px; background: #f7fafc; border: 1px solid var(--line); border-radius: 14px; }
+    .export-step .step-number { flex: none; width: 25px; height: 25px; display: grid; place-items: center; border-radius: 8px; background: var(--blue-soft); color: var(--blue-deep); font-weight: 900; font-size: 12px; }
+    .export-step b { display: block; font-size: 12px; margin-bottom: 3px; }
+    .export-step p { font-size: 11px; }
+    .export-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 17px; }
+    .export-actions a { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 12px; }
+    .export-actions button:disabled { opacity: .55; cursor: wait; }
+    .export-status { min-height: 18px; margin-top: 12px !important; }
     .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); background: #182336; color: #fff; border-radius: 12px; padding: 11px 17px; opacity: 0; pointer-events: none; transition: .22s; z-index: 50; font-size: 12px; box-shadow: 0 10px 25px rgba(0,0,0,.2); }
     .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
@@ -239,7 +248,7 @@
       .profile { display: none; }
       .editor-top { height: auto; min-height: 108px; padding: 9px 12px; gap: 8px; flex-wrap: wrap; }
       .editor-left, .editor-right { width: 100%; justify-content: space-between; }
-      .editor-right .save-state, .editor-right #shareBtn { display: none; }
+      .editor-right .save-state { display: none; }
       .editor-right .permission-select { font-size: 11px; padding: 9px; }
       .editor-shell { height: calc(100vh - 108px); }
       .modal.wheel-modal { width: 96vw; padding: 20px; }
@@ -306,7 +315,7 @@
   <div id="editorView">
     <header class="editor-top">
       <div class="editor-left"><button class="back-btn" id="backBtn">←</button><div class="logo-crop" style="width:39px;height:39px;border-radius:12px"><img src="assets/cat-logo.jpeg" alt="Logo"></div><div class="file-name"><b id="editorTitle">第一课：人物描写</b><span>初二华文 A 班 · 第 1 / 12 页</span></div></div>
-      <div class="editor-right"><span class="save-state" id="saveState">✓ 已保存到本机</span><button class="interaction-btn" id="editorWheel" title="在当前文档中打开随机点名">◉ 随机点名</button><select class="permission-select" id="permission"><option>✎ 访客可修改</option><option>▣ 锁定</option><option>● 草稿／隐藏</option></select><button class="secondary" id="shareBtn">分享</button></div>
+      <div class="editor-right"><span class="save-state" id="saveState">✓ 已保存到本机</span><button class="interaction-btn" id="editorWheel" title="在当前文档中打开随机点名">◉ 随机点名</button><select class="permission-select" id="permission"><option>✎ 访客可修改</option><option>▣ 锁定</option><option>● 草稿／隐藏</option></select><button class="primary" id="exportBtn" title="下载带笔迹的 PDF，再上传到 Google">⇩ 导出笔记</button></div>
     </header>
     <div class="editor-shell">
       <aside class="toolbar">
@@ -320,6 +329,7 @@
   <div class="modal-backdrop" id="uploadModal"><div class="modal"><div class="modal-head"><div><h3>上传 PDF 资料</h3><p>文件会保存在这台电脑的浏览器中，上传后先设为草稿。</p></div><button class="close" data-close>×</button></div><label class="dropzone" for="pdfFile"><div><strong>⇧</strong><b>选择 PDF 文件</b><p>单个文件不超过 100 MB</p></div></label><input id="pdfFile" type="file" accept="application/pdf,.pdf" hidden><div class="modal-actions"><button class="secondary" data-close>取消</button><button class="primary" id="fakeUpload">选择 PDF</button></div></div></div>
   <div class="modal-backdrop" id="rosterModal"><div class="modal"><div class="modal-head"><div><h3>学生名单</h3><p>每行一位学生。也可以导入包含姓名的 CSV 文件。</p></div><button class="close" data-close>×</button></div><textarea id="rosterText" aria-label="学生名单" style="width:100%;min-height:220px;margin-top:16px;border:1px solid var(--line);border-radius:14px;padding:13px;resize:vertical;line-height:1.7"></textarea><input id="rosterFile" type="file" accept=".csv,text/csv" hidden><div class="modal-actions" style="justify-content:space-between"><button class="secondary" id="importRoster">导入 CSV</button><div><button class="secondary" data-close>取消</button> <button class="primary" id="saveRoster">保存名单</button></div></div></div></div>
   <div class="modal-backdrop" id="wheelModal"><div class="modal wheel-modal"><div class="modal-head"><div><h3>随机点名</h3><p>名字经过中央时响起节拍，放慢后揭晓结果。</p></div><button class="close" data-close aria-label="关闭随机点名">×</button></div><div class="reel-intro"><span class="reel-count" id="reelCount">参与抽选 · 0 人</span><span class="reel-hint">每位学生都有相同的获选机会</span></div><div class="reel-shell" id="reelShell"><div class="reel-window" id="reelWindow"><div class="reel-focus"></div><div class="reel-track" id="reelTrack" aria-hidden="true"></div></div><div class="reel-progress" aria-hidden="true"><span id="reelProgress"></span></div></div><div class="reel-footer"><div class="wheel-subtitle" id="wheelSubtitle" aria-live="polite">点击开始，让名字滚动起来</div><div class="reel-actions"><button class="secondary" id="musicToggle" aria-pressed="true" aria-label="关闭背景音乐">♫ 音乐开</button><button class="secondary" id="soundToggle" aria-pressed="true" aria-label="关闭抽选音效">♪ 音效开</button><button class="primary" id="spinAgain">开始抽选</button></div></div><div id="winner" class="sr-only" aria-live="polite"></div></div></div>
+  <div class="modal-backdrop" id="exportModal"><div class="modal"><div class="modal-head"><div><h3>保存并分享课堂笔记</h3><p>原 PDF、笔迹和新增的空白页会合成一份 PDF。</p></div><button class="close" data-close aria-label="关闭导出窗口">×</button></div><div class="export-guide"><div class="export-step"><span class="step-number">1</span><div><b>下载课堂笔记</b><p>保留原 PDF 页面尺寸，笔迹会印在对应页面上。</p></div></div><div class="export-step"><span class="step-number">2</span><div><b>上传给学生</b><p>到 Google Classroom 的「课业」→「建立」→「资料」上传刚下载的 PDF；也可先放进 Google Drive。</p></div></div></div><div class="export-actions"><button class="primary" id="downloadPdf">⇩ 下载带笔迹 PDF</button><a class="secondary" href="https://classroom.google.com/" target="_blank" rel="noopener noreferrer">打开 Google Classroom ↗</a><a class="secondary" href="https://drive.google.com/drive/my-drive" target="_blank" rel="noopener noreferrer">打开 Google Drive ↗</a></div><p class="export-status" id="exportStatus" role="status">文件只会下载到这台电脑；打开 Google 后再选择文件上传。</p></div></div>
   <div class="toast" id="toast">已完成</div>
 
   <script>
@@ -339,7 +349,6 @@
     $$('.doc-card').forEach(c=>c.onclick=()=>showEditor(c.dataset.title));
     $('#backBtn').onclick=()=>{$('#editorView').style.display='none';$('#dashboardView').style.display='grid'};
     $('#permission').onchange=e=>toast(e.target.value.includes('锁定')?'已锁定，访客只能查看':'文档权限已更新');
-    $('#shareBtn').onclick=()=>toast('分享链接需要云端服务');
     let students=['林伟杰','陈欣怡','黄子轩','李嘉恩','吴俊豪','张慧敏'];
     let spinning=false, soundOn=true, musicOn=true, audioContext, spinTimer, spinFrame, musicTimer, musicBeat=0, spinToken=0;
     const musicVoices=new Set();
@@ -504,7 +513,7 @@
     $('#clearBtn').onclick=()=>{if(!strokes.length)return toast('本页没有批注');const before=clone();strokes=[];selected=[];save(before);updateSelection();toast('本页批注已清除，可撤销')};
     window.editorAPI={
       getStrokes:()=>clone(),
-      setStrokes:value=>{strokes=Array.isArray(value)?value:[];selected=[];undo=[];redo=[];resizeCanvas()},
+      setStrokes:value=>{strokes=Array.isArray(value)?value:[];selected=[];undo=[];redo=[];canvas.dataset.w=sheet.clientWidth;canvas.dataset.h=sheet.clientHeight;resizeCanvas()},
       setStudents:value=>{students=value;if(!spinning)setupReel(students)},
       resize:resizeCanvas,
       toast,openModal,closeModals,showEditor
