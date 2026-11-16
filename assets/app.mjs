@@ -1,4 +1,5 @@
 import * as pdfjs from './pdf.mjs';
+import { buildAnnotatedPdf } from './export.mjs';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('./pdf.worker.mjs', import.meta.url).href;
 
@@ -10,7 +11,19 @@ const exampleStudents = ['林伟杰','陈欣怡','黄子轩','李嘉恩','吴俊
 let records = readJSON(recordsKey, []);
 let roster = readJSON(rosterKey, exampleStudents);
 let current = null, pageNumber = 1, pageOrder = [1], pdf = null, renderTask = null;
-let dbPromise;
+let dbPromise, pdfLibPromise;
+
+function loadPdfLib() {
+  if (window.PDFLib) return Promise.resolve(window.PDFLib);
+  if (!pdfLibPromise) pdfLibPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = new URL('./pdf-lib.min.js', import.meta.url).href;
+    script.onload = () => window.PDFLib ? resolve(window.PDFLib) : reject(Error('PDF 导出组件未载入'));
+    script.onerror = () => reject(Error('PDF 导出组件下载失败，请检查网络'));
+    document.head.append(script);
+  }).catch(error => {pdfLibPromise = null;throw error});
+  return pdfLibPromise;
+}
 
 function readJSON(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
@@ -51,9 +64,12 @@ async function remove(key) {
   });
 }
 function pageRef() { return pageOrder[pageNumber - 1] ?? 1; }
+function inkKeyFor(ref, document = current) {
+  return `ink:${document?.id ?? document?.title}:${typeof ref === 'number' ? ref : ref.id}`;
+}
 function inkKey() {
   const ref = pageRef();
-  return `ink:${current?.id ?? current?.title}:${typeof ref === 'number' ? ref : ref.id}`;
+  return inkKeyFor(ref);
 }
 function sampleOrderKey() { return `cloud-classroom-sample-pages-v1:${current.title}`; }
 function persistPageOrder() {
@@ -69,7 +85,8 @@ function persistPageOrder() {
 }
 window.saveDocumentState = () => {
   if (!current) return Promise.resolve();
-  const key = inkKey(), value = api.getStrokes();
+  const key = inkKey(), canvas = byId('drawCanvas');
+  const value = {width:canvas.clientWidth, height:canvas.clientHeight, strokes:api.getStrokes()};
   return put(key, value).catch(error => {api.toast('本机存储失败，请检查浏览器空间');throw error});
 };
 
@@ -185,7 +202,13 @@ async function renderPage() {
   try {await renderTask.promise} catch(error) {if(error.name !== 'RenderingCancelledException')throw error}
 }
 async function loadInk() {
-  try {api.setStrokes((await get(inkKey())) || []);} catch {api.setStrokes([])}
+  try {
+    const saved = await get(inkKey());
+    if (Array.isArray(saved)) return api.setStrokes(saved);
+    const width = byId('pdfSheet').clientWidth, height = byId('pdfSheet').clientHeight;
+    const strokes = (saved?.strokes || []).map(stroke => ({...stroke, points:stroke.points.map(point => ({x:point.x * width / (saved.width || width), y:point.y * height / (saved.height || height)}))}));
+    api.setStrokes(strokes);
+  } catch {api.setStrokes([])}
 }
 window.openDocument = async (title,id) => {
   current = (id && records.find(item => item.id === id)) || {title, status:'可修改'};
@@ -239,5 +262,49 @@ byId('deleteBlankPage').onclick = async () => {
   await renderPage();
   await loadInk();
   api.toast('空白页已删除');
+};
+
+byId('exportBtn').onclick = () => {
+  const available = !!current?.id && !!pdf;
+  byId('downloadPdf').disabled = !available;
+  byId('exportStatus').textContent = available
+    ? `准备导出「${current.title}」，共 ${pageOrder.length} 页。下载后可打开 Google Classroom 或 Drive 上传。`
+    : '示例页面不是真实 PDF。请先上传自己的 PDF，再下载带笔迹的版本。';
+  api.openModal('#exportModal');
+};
+byId('downloadPdf').onclick = async () => {
+  if (!current?.id || !pdf) return;
+  const button = byId('downloadPdf'), status = byId('exportStatus');
+  button.disabled = true;button.textContent = '正在合成 PDF…';status.textContent = '正在合成原 PDF、空白页和笔迹，请稍候。';
+  try {
+    await window.saveDocumentState();
+    const record = current, order = [...pageOrder], viewer = pdf;
+    const blob = await get(`file:${record.id}`);
+    if (!blob) throw Error('原 PDF 已不在此浏览器中');
+    const pdfLib = await loadPdfLib();
+    const stage = byId('canvasStage');
+    const bytes = await buildAnnotatedPdf({
+      sourceBytes:new Uint8Array(await blob.arrayBuffer()),
+      pageOrder:order,
+      lib:pdfLib,
+      getViewport:async number => (await viewer.getPage(number)).getViewport({scale:1}),
+      loadInk:async (ref, viewport) => {
+        const saved = await get(inkKeyFor(ref, record));
+        if (!Array.isArray(saved)) return saved;
+        const width = Math.min(viewport.width * 96 / 72, Math.max(220, stage.clientWidth - (window.innerWidth <= 760 ? 24 : 72)));
+        return {width, height:width * viewport.height / viewport.width, strokes:saved};
+      },
+    });
+    const url = URL.createObjectURL(new Blob([bytes], {type:'application/pdf'}));
+    const link = document.createElement('a');
+    link.href = url;link.download = `${record.title.replace(/[<>:"/\\|?*\x00-\x1f]/g,'_')}-课堂笔记.pdf`;
+    document.body.append(link);link.click();link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    status.textContent = `已下载 ${order.length} 页 PDF。现在可点「打开 Google Classroom」上传到课室资料。`;
+    api.toast('课堂笔记 PDF 已下载');
+  } catch (error) {
+    console.error(error);
+    status.textContent = `导出失败：${error.message || '请检查原 PDF 与本机空间'}`;
+  } finally {button.disabled = false;button.textContent = '⇩ 下载带笔迹 PDF';}
 };
 window.addEventListener('resize', () => {if (byId('editorView').style.display === 'block' && pdf) renderPage().catch(console.error)});
