@@ -1,5 +1,6 @@
 import * as pdfjs from './pdf.mjs';
 import { buildAnnotatedPdf } from './export.mjs';
+import { buildRoomBackup, readRoomBackup } from './backup.mjs';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('./pdf.worker.mjs', import.meta.url).href;
 
@@ -7,11 +8,18 @@ const api = window.editorAPI;
 const byId = id => document.getElementById(id);
 const recordsKey = 'cloud-classroom-documents-v1';
 const rosterKey = 'cloud-classroom-roster-v1';
+const roomsKey = 'cloud-classroom-rooms-v1';
+const selectedRoomKey = 'cloud-classroom-selected-room-v1';
 const exampleStudents = ['林伟杰','陈欣怡','黄子轩','李嘉恩','吴俊豪','张慧敏'];
-let records = readJSON(recordsKey, []);
-let roster = readJSON(rosterKey, exampleStudents);
+let rooms = readJSON(roomsKey, null);
+if (!Array.isArray(rooms) || !rooms.length) {
+  rooms = [{id:crypto.randomUUID(), name:'初二华文 A 班', roster:readJSON(rosterKey, exampleStudents), records:readJSON(recordsKey, [])}];
+  localStorage.setItem(roomsKey, JSON.stringify(rooms));
+}
+let room = rooms.find(item => item.id === localStorage.getItem(selectedRoomKey)) || rooms[0];
+let records = room.records, roster = room.roster;
 let current = null, pageNumber = 1, pageOrder = [1], pdf = null, renderTask = null;
-let dbPromise, pdfLibPromise;
+let dbPromise, pdfLibPromise, zipPromise, activeFilter = '全部', selectedDoc = null;
 
 function loadPdfLib() {
   if (window.PDFLib) return Promise.resolve(window.PDFLib);
@@ -25,11 +33,24 @@ function loadPdfLib() {
   return pdfLibPromise;
 }
 
+function loadZip() {
+  if (window.JSZip) return Promise.resolve(window.JSZip);
+  if (!zipPromise) zipPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = new URL('./jszip.min.js', import.meta.url).href;
+    script.onload = () => window.JSZip ? resolve(window.JSZip) : reject(Error('备份组件未载入'));
+    script.onerror = () => reject(Error('备份组件下载失败，请检查网络'));
+    document.head.append(script);
+  }).catch(error => {zipPromise = null;throw error});
+  return zipPromise;
+}
+
 function readJSON(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
 }
-function persistRecords() { localStorage.setItem(recordsKey, JSON.stringify(records)); }
-function updateRecordCount() {byId('recordCount').textContent = `${records.length + 4} 份 PDF（含 4 份示例）· 本机保存`}
+function persistRooms() { localStorage.setItem(roomsKey, JSON.stringify(rooms)); }
+function persistRecords() { room.records = records; persistRooms(); }
+function updateRecordCount() {byId('recordCount').textContent = `${records.length} 份 PDF · 本机保存`}
 function openDB() {
   if (!dbPromise) dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open('cloud-classroom-prototype', 1);
@@ -94,15 +115,93 @@ function updateRoster() {
   api.setStudents(roster);
   byId('rosterText').value = roster.join('\n');
   document.querySelector('.students-count').innerHTML = `${roster.length} <small>名学生</small>`;
+  const faces = document.querySelector('.faces');
+  faces.replaceChildren();
+  roster.slice(0, 5).forEach(name => {
+    const face = document.createElement('div');face.className = 'face';face.textContent = name.slice(0, 1);faces.append(face);
+  });
+  if (roster.length > 5) {const extra = document.createElement('div');extra.className='face';extra.textContent=`+${roster.length-5}`;faces.append(extra)}
   byId('wheelModal').querySelector('p').textContent = `从 ${roster.length} 名学生中抽选。`;
 }
 updateRoster();
+
+function updateRoomLabels() {
+  for (const id of ['roomSwitchName','roomCrumb','roomHeroName']) byId(id).textContent = room.name;
+  byId('roomInitial').textContent = room.name.slice(0, 1);
+  updateRoster();updateRecordCount();
+}
+function renderRoomList() {
+  const list = byId('roomList');list.replaceChildren();
+  rooms.forEach(item => {
+    const button = document.createElement('button');button.type='button';button.className='room-row' + (item.id === room.id ? ' active' : '');
+    const badge = document.createElement('span');badge.className='room-badge';badge.textContent=item.name.slice(0,1);
+    const label = document.createElement('span');const title=document.createElement('b');title.textContent=item.name;
+    const detail=document.createElement('small');detail.textContent=`${item.records.length} 份 PDF · ${item.roster.length} 名学生`;
+    label.append(title,detail);button.append(badge,label);
+    button.onclick=()=>switchRoom(item.id);list.append(button);
+  });
+}
+function openRooms() {renderRoomList();byId('roomStatus').textContent='';api.openModal('#roomModal')}
+for (const id of ['roomSwitch','mobileRoomSwitch']) byId(id).onclick=openRooms;
+byId('topBackup').onclick=openRooms;
+function switchRoom(id) {
+  const target=rooms.find(item=>item.id===id);if(!target)return;
+  room=target;records=room.records;roster=room.roster;current=null;pdf=null;
+  localStorage.setItem(selectedRoomKey, room.id);
+  byId('docSearch').value='';activeFilter='全部';
+  document.querySelectorAll('.chip[data-filter]').forEach(button=>button.classList.toggle('active',button.dataset.filter==='全部'));
+  updateRoomLabels();renderDocuments();api.closeModals();api.toast(`已切换到${room.name}`);
+}
+byId('createRoom').onclick=()=>{
+  const name=byId('newRoomName').value.trim();
+  if(!name)return api.toast('请先输入课室名称');
+  if(rooms.some(item=>item.name.toLocaleLowerCase()===name.toLocaleLowerCase()))return api.toast('已有同名课室');
+  const created={id:crypto.randomUUID(),name,roster:[],records:[]};rooms.push(created);persistRooms();
+  byId('newRoomName').value='';switchRoom(created.id);
+};
+byId('newRoomName').onkeydown=event=>{if(event.key==='Enter')byId('createRoom').click()};
+byId('backupRoom').onclick=async()=>{
+  const button=byId('backupRoom'),status=byId('roomStatus');button.disabled=true;status.textContent='正在打包原 PDF、名单和笔迹…';
+  try {
+    const Zip=await loadZip();
+    const blob=await buildRoomBackup({room,get,Zip});
+    const url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;link.download=`${room.name.replace(/[<>:"/\\|?*\x00-\x1f]/g,'_')}-课室备份-${new Date().toISOString().slice(0,10)}.zip`;
+    document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+    status.textContent=`备份已下载：${room.records.length} 份 PDF、${room.roster.length} 名学生。请把 ZIP 保存在安全位置。`;
+  } catch(error) {console.error(error);status.textContent=`备份失败：${error.message || '请检查本机空间'}`}
+  finally {button.disabled=false}
+};
+byId('restoreRoom').onclick=()=>byId('backupFile').click();
+byId('backupFile').onchange=async event=>{
+  const file=event.target.files?.[0];if(!file)return;
+  const button=byId('restoreRoom'),status=byId('roomStatus');button.disabled=true;status.textContent='正在检查备份并建立新课室…';
+  const written=[];let created=null;
+  try {
+    const Zip=await loadZip();
+    const data=await readRoomBackup({file,Zip,createId:()=>crypto.randomUUID()});
+    let name=data.name,n=2;
+    while(rooms.some(item=>item.name.toLocaleLowerCase()===name.toLocaleLowerCase()))name=`${data.name}（导入 ${n++}）`;
+    created={id:crypto.randomUUID(),name,roster:data.roster,records:data.documents.map(item=>item.record)};
+    for(const item of data.documents){
+      const key=`file:${item.record.id}`;await put(key,item.pdf);written.push(key);
+      for(const ink of item.inks){await put(ink.key,ink.value);written.push(ink.key)}
+    }
+    rooms.push(created);persistRooms();switchRoom(created.id);
+    api.toast(`已还原${created.name}：${created.records.length} 份 PDF`);
+  } catch(error) {
+    console.error(error);
+    if(created)rooms=rooms.filter(item=>item.id!==created.id);
+    for(const key of written)await remove(key).catch(console.error);
+    status.textContent=`导入失败：${error.message || '请检查备份文件和浏览器空间'}`;
+  } finally {button.disabled=false;event.target.value=''}
+};
 function openRoster() { updateRoster(); api.openModal('#rosterModal'); }
 for (const id of ['rosterNav','rosterOpen','quickRoster']) byId(id).onclick = openRoster;
 byId('saveRoster').onclick = () => {
   const names = byId('rosterText').value.split(/\r?\n|，|,/).map(x => x.trim()).filter(Boolean);
   roster = [...new Set(names)];
-  localStorage.setItem(rosterKey, JSON.stringify(roster));
+  room.roster=roster;persistRooms();
   updateRoster(); api.closeModals(); api.toast(`已保存 ${roster.length} 名学生`);
 };
 byId('importRoster').onclick = () => byId('rosterFile').click();
@@ -119,7 +218,7 @@ byId('rosterFile').onchange = async event => {
 function makeCard(record) {
   const card = document.createElement('article'); card.className = 'doc-card';
   card.dataset.title = record.title; card.dataset.id = record.id;
-  card.innerHTML = '<div class="doc-preview"><span class="pdf-badge">PDF</span><div class="page-mini"><div class="mini-title"></div><div class="mini-line"></div><div class="mini-line short"></div><div class="scribble"></div></div></div><div class="doc-body"><div class="doc-title-row"><div class="doc-title"></div><button class="more" title="资料选项">•••</button></div><div class="doc-meta"></div><div class="doc-footer"><button class="state"></button><button class="open-link">打开 ›</button></div></div>';
+  card.innerHTML = '<div class="doc-preview"><span class="pdf-badge">PDF</span><div class="page-mini"><div class="mini-title"></div><div class="mini-line"></div><div class="mini-line short"></div><div class="scribble"></div></div></div><div class="doc-body"><div class="doc-title-row"><div class="doc-title"></div><button class="more" title="资料选项" aria-label="管理 PDF">•••</button></div><div class="doc-meta"></div><div class="doc-footer"><button class="state"></button><button class="open-link">打开 ›</button></div></div><div class="doc-menu"><button data-action="rename">更改名称</button><button data-action="up">上移</button><button data-action="down">下移</button><button data-action="delete" class="danger">删除资料</button></div>';
   card.querySelector('.doc-title').textContent = record.title;
   card.querySelector('.doc-meta').textContent = `${record.pages || '—'} 页 · 本机保存`;
   const state = card.querySelector('.state');
@@ -131,15 +230,64 @@ function makeCard(record) {
   state.onclick = event => {
     event.stopPropagation();
     record.status = record.status === '草稿' ? '可修改' : record.status === '可修改' ? '锁定' : '可修改';
-    persistRecords(); paintState(); api.toast(`已设为${record.status}`);
+    persistRecords(); paintState(); applyDocumentFilter(); api.toast(`已设为${record.status}`);
     if (current?.id === record.id) syncPermission();
   };
-  card.querySelector('.more').onclick = event => { event.stopPropagation(); api.toast('资料选项将在后续版本加入'); };
+  card.querySelector('.more').onclick = event => {
+    event.stopPropagation();document.querySelectorAll('.doc-menu.show').forEach(menu=>{if(menu!==card.querySelector('.doc-menu'))menu.classList.remove('show')});
+    card.querySelector('.doc-menu').classList.toggle('show');
+  };
+  card.querySelectorAll('.doc-menu button').forEach(button=>button.onclick=event=>{
+    event.stopPropagation();card.querySelector('.doc-menu').classList.remove('show');
+    const action=button.dataset.action;
+    if(action==='rename'){selectedDoc=record;byId('docNameInput').value=record.title;api.openModal('#renameDocModal');byId('docNameInput').focus()}
+    else if(action==='delete'){selectedDoc=record;byId('deleteDocMessage').textContent=`删除「${record.title}」及所有笔迹？此操作无法撤销，请先备份课室。`;api.openModal('#deleteDocModal')}
+    else {const index=records.indexOf(record),other=index+(action==='up'?-1:1);if(other>=0&&other<records.length){[records[index],records[other]]=[records[other],records[index]];persistRecords();renderDocuments()}}
+  });
   card.onclick = () => api.showEditor(record.title, record.id);
-  document.querySelector('.document-grid').prepend(card);
+  document.querySelector('.document-grid').append(card);
 }
-records.forEach(makeCard);
-updateRecordCount();
+function applyDocumentFilter() {
+  const term=byId('docSearch').value.trim().toLocaleLowerCase();let shown=0;
+  document.querySelectorAll('.document-grid > .doc-card').forEach(card=>{
+    const record=records.find(item=>item.id===card.dataset.id);
+    const visible=!!record && (activeFilter==='全部'||record.status===activeFilter) && record.title.toLocaleLowerCase().includes(term);
+    card.hidden=!visible;if(visible)shown++;
+  });
+  byId('emptyDocuments').hidden=shown>0;
+  byId('emptyDocuments').textContent=records.length ? '没有符合条件的 PDF。' : '这间课室还没有 PDF，点击「上传 PDF」开始。';
+}
+function renderDocuments() {
+  const grid=document.querySelector('.document-grid');grid.replaceChildren();
+  records.forEach(makeCard);
+  const empty=document.createElement('div');empty.id='emptyDocuments';empty.className='empty-docs';grid.append(empty);
+  updateRecordCount();applyDocumentFilter();
+}
+document.querySelectorAll('.chip[data-filter]').forEach(button=>button.onclick=()=>{
+  activeFilter=button.dataset.filter;
+  document.querySelectorAll('.chip[data-filter]').forEach(item=>item.classList.toggle('active',item===button));
+  applyDocumentFilter();
+});
+byId('docSearch').oninput=applyDocumentFilter;
+byId('saveDocName').onclick=()=>{
+  if(!selectedDoc)return;const name=byId('docNameInput').value.trim();if(!name)return api.toast('请输入 PDF 名称');
+  selectedDoc.title=name;persistRecords();
+  if(current?.id===selectedDoc.id){current.title=name;byId('editorTitle').textContent=name}
+  renderDocuments();api.closeModals();api.toast('PDF 已改名');selectedDoc=null;
+};
+byId('docNameInput').onkeydown=event=>{if(event.key==='Enter')byId('saveDocName').click()};
+byId('confirmDeleteDoc').onclick=async()=>{
+  if(!selectedDoc)return;const record=selectedDoc;const button=byId('confirmDeleteDoc');button.disabled=true;
+  try {
+    await remove(`file:${record.id}`);
+    for(const ref of record.pageOrder||[]) await remove(inkKeyFor(ref,record));
+    records=records.filter(item=>item.id!==record.id);room.records=records;persistRooms();
+    renderDocuments();api.closeModals();api.toast('PDF 与笔迹已删除');selectedDoc=null;
+  }catch(error){console.error(error);api.toast('删除失败，请重试')}
+  finally{button.disabled=false}
+};
+updateRoomLabels();renderDocuments();
+document.addEventListener('click',event=>{if(!event.target.closest('.more,.doc-menu'))document.querySelectorAll('.doc-menu.show').forEach(menu=>menu.classList.remove('show'))});
 
 byId('pdfFile').onchange = async event => {
   const file = event.target.files?.[0]; if (!file) return;
@@ -149,7 +297,7 @@ byId('pdfFile').onchange = async event => {
   try {
     await put(`file:${id}`, file);
     const record = {id, title:file.name.replace(/\.pdf$/i, ''), pages:null, status:'草稿'};
-    records.push(record); persistRecords(); makeCard(record); updateRecordCount();
+    records.push(record); persistRecords(); renderDocuments();
     api.closeModals(); api.toast('PDF 已保存为草稿');
     event.target.value = '';
   } catch (error) { console.error(error); api.toast('PDF 未保存成功，请检查浏览器空间'); }
@@ -173,7 +321,7 @@ async function renderPage() {
   byId('pdfCanvas').style.display = visiblePdf ? 'block' : 'none';
   document.querySelector('.pdf-content').style.display = !pdf && typeof ref === 'number' ? 'block' : 'none';
   byId('pageLabel').textContent = `${pageNumber} / ${pageOrder.length}`;
-  document.querySelector('.file-name span').textContent = `初二华文 A 班 · 第 ${pageNumber} / ${pageOrder.length} 页${typeof ref === 'number' ? '' : ' · 空白页'}`;
+  document.querySelector('.file-name span').textContent = `${room.name} · 第 ${pageNumber} / ${pageOrder.length} 页${typeof ref === 'number' ? '' : ' · 空白页'}`;
   byId('deleteBlankPage').disabled = typeof ref === 'number';
   if (!pdf) {
     const sheet = byId('pdfSheet');
